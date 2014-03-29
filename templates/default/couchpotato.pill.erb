@@ -1,0 +1,31 @@
+Bluepill.application("couchpotato") do |app|
+
+  app.process("server") do |proc|
+
+    proc.uid = "<%= node["couchpotato"]["user"] %>"
+    proc.gid = "<%= node["couchpotato"]["group"] %>"
+
+    proc.working_dir = "<%= node["couchpotato"]["directories"]["install"] %>"
+    proc.start_command = "python CouchPotato.py --data_dir <%= node["couchpotato"]["directories"]["data"] %> --config_file <%= node["couchpotato"]["directories"]["config"] %>/couchpotato.ini"
+
+    # We're letting Bluepill daemonize for us
+    proc.daemonize = true
+
+    # Logging
+    proc.stdout = proc.stderr = "<%= node["couchpotato"]["directories"]["logs"] %>/couchpotato.log"
+
+    # Process Monitoring
+    proc.checks :cpu_usage, :every => 30.seconds, :below => 85, :times => 10
+    proc.checks :mem_usage, :every => 30.seconds, :below => 1024.megabytes, :times => [3,5]
+    proc.checks :flapping, :times => 2, :within => 30.seconds, :retry_in => 7.seconds
+
+    # Child Processes
+    proc.monitor_children do |child_proc|
+      child_proc.checks :cpu_usage, :every => 30.seconds, :below => 50, :times => 10
+      child_proc.checks :mem_usage, :every => 30.seconds, :below => 256.megabytes, :times => [3,5]
+      child_proc.stop_command = "kill -QUIT {{PID}}"
+    end
+
+  end
+
+end
